@@ -2,6 +2,7 @@
 # https://github.com/facebookresearch/fairo/blob/main/polymetis/polymetis/conf/robot_client/franka_hardware.yaml
 # supposedly we should be able to directly extend that file, but i can't figure out how to get it to work!
 # https://hydra.cc/docs/patterns/extending_configs/
+# Updated limits based on FR3 instead of Panda
 
 hz: 1000
 use_real_time: true
@@ -46,30 +47,30 @@ robot_client:
 
       # the remaining limits are set to the original franka limits minus a margin
       joint_pos_upper: #margin: 0.1 rad
-        - 2.80
+        - 2.70
         - 1.66
         - 2.80
-        - -0.17
-        - 2.80
-        - 3.65
-        - 2.80
+        - -0.25
+        - 2.70
+        - 4.41
+        - 2.90
       joint_pos_lower: #margin: 0.1 rad
-        - -2.80
+        - -2.70
         - -1.66
         - -2.80
-        - -2.97
-        - -2.80
-        - 0.08
-        - -2.80
+        - -2.94
+        - -2.70
+        - 0.64
+        - -2.90
       joint_vel: #margin: 0.1 rad/s
-        - 2.075
-        - 2.075
-        - 2.075
-        - 2.075
-        - 2.51
-        - 2.51
-        - 2.51
-      elbow_vel: 2.075      #margin: 0.1 rad/s
+        - 2.52
+        - 2.52
+        - 2.52
+        - 2.52
+        - 5.16
+        - 4.08
+        - 5.16
+      elbow_vel: 2.52      #margin: 0.1 rad/s
       joint_torques:  #margin: 1N for first 4 joints, 0.5N for last 3 joints
         - 86.0
         - 86.0
