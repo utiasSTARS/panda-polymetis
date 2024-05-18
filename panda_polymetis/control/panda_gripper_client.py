@@ -4,9 +4,10 @@ from polymetis import GripperInterface
 
 
 class PandaGripperClient:
-    def __init__(self, server_ip='localhost', open_width=0.08, grasp_force=10, grip_speed=0.05,
-                 close_force=60, pinch_width=.04, not_open_means_close=True):
-        print("Starting Panda gripper client.")
+    # Set up for 2f85
+    def __init__(self, server_ip='localhost', open_width=0.085, grasp_force=20, grip_speed=0.05,
+                 close_force=20, pinch_width=.04, not_open_means_close=True):
+        print("Starting 2f85 gripper client.")
 
         self.server_ip = server_ip
         self.open_width = open_width
@@ -14,6 +15,7 @@ class PandaGripperClient:
         self.default_speed = grip_speed
         self.default_close_force = close_force
         self.default_pinch_width = pinch_width
+        self._max_width = open_width
 
         # self.gripper = GripperInterface(ip_address=self.server_ip, enforce_version=False)
         self.gripper = GripperInterface(ip_address=self.server_ip)
@@ -26,34 +28,25 @@ class PandaGripperClient:
             if self._pos < (self._max_width - .001):  # a bit of tolerance
                 self._state = "close"
 
-        # this doesn't actually work
-        # state_init = self.get_and_update_state()
-        # time.sleep(.1)
-        # state_after = self.get_and_update_state()
-        # if state_after["is_moving"] and np.linalg.norm(state_init["pos"] - state_after["pos"]) < .001:
-        #     self._state = "close"
-
         # internal state tracking
         self._pos = None
         self._error_code = 0
 
     def get_and_update_state(self):
-        # google.protobuf.Timestamp timestamp = 1;
-        # float width = 2;`
-        # bool is_grasped = 3;
-        # bool is_moving = 4;
-        # bool prev_command_successful = 6;
-        # int32 error_code = 5;`
         state = self.gripper.get_state()
         self._pos = state.width
         # self._error_code = state.error_code
-        self._max_width = state.max_width
+        # self._max_width = state.max_width
 
         return {
             "pos": state.width,
-            "max_width": state.max_width,
-            "is_moving": state.is_moving
+            # "max_width": state.max_width,
+            # "is_moving": state.is_moving
         }
+
+    def is_fully_open(self):
+        self.get_and_update_state()
+        return self._pos >= (self._max_width - .001)
 
     def send_move_goal(self, width, speed=None, force=None, blocking=False):
         if speed is None: speed = self.default_speed

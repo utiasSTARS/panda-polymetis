@@ -8,7 +8,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         'polymetis',
-        'transform_utils'
+        'transform_utils',
+        'pymodbus==2.5.3'  # should have been installed by polymetis
     ],
     include_package_data=True
 )
