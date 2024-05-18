@@ -8,6 +8,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'polymetis',
+        'transform_utils'
     ],
     include_package_data=True
 )

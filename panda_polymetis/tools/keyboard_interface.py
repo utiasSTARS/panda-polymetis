@@ -295,7 +295,7 @@ if __name__=="__main__":
         ee_config_json=json_file)
 
     gripper_client = None
-    if not args.no_gripper:
+    if not args.no_gripper and args.server_ip != "localhost":
         gripper_client = PandaGripperClient(
             # server_ip='localhost',  # should be run NOT on NUC!
             server_ip=args.gripper_ip,

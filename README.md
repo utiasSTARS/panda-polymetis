@@ -4,7 +4,9 @@ This is meant to provide a set of convenience functions that operate between pol
 Originally developed at Samsung AI Centre -- Montreal, and part of this [tactile imitation learning monorepo](https://github.com/SAIC-MONTREAL/tactile-il).
 Modified from the original Samsung version to work with the FR3 (original Panda no longer in production).
 
-# Requirements/Installation
+## Requirements/Installation
+- [transform-utils](https://github.com/utiasSTARS/transform-utils)
+  - `git clone https://github.com/utiasSTARS/transform-utils && cd transform-utils && bash install.sh`
 - To use this package, you must [install polymetis](https://facebookresearch.github.io/fairo/polymetis/installation.html) on both the RT computer (usually a NUC) that controls the Panda and also on your local computer that will handle vision/policy control
 - To use it with an FR3, you *must* [install from source](https://facebookresearch.github.io/fairo/polymetis/installation.html#from-source), and set the `<version_tag_or_commit_hash>` for the `libfranka` build to `0.10.0` (or later, but only `0.10.0` has been tested).
   - **to be confirmed**: the source install might only be required on the NUC, and not on your local version.
@@ -13,7 +15,7 @@ Modified from the original Samsung version to work with the FR3 (original Panda 
 - If you're installing on your local computer, you can instead use the gpu-enabled pytorch:
   - `pip install --force-reinstall torch==1.13.1`
 
-## Updating pytorch and finishing polymetis build from source
+### Updating pytorch and finishing polymetis build from source
 **WARNING**: This requires roughly ~10GB of space in `/`.
 **TODO**: this might be completely unnecessary, which is to be verified.
 The plan is to simply use the built polymetis (with libfranka 0.10.0) with *non*-gpu enabled pytorch on the NUC, and use non-built polymetis (with libfranka 0.9.0) with gpu enabled pytorch on my local machine, and assume that libfranka is not necessary for the comm between machines....
@@ -27,7 +29,17 @@ The plan is to simply use the built polymetis (with libfranka 0.10.0) with *non*
 7. Add `#include <stddef.h>` to the top of `fairo/polymetis/polymetis/torch_isolation/include/torch_server_ops.hpp`
 8. Run `make -j`
 
-# Usage
+## Usage
+
+### Bring up a robot
+1. `cd launch`
+2. sim: `bash sim_robot.bash`, real: `bash real_robot.bash`
+
+### test with keyboard control
+Instructions for use come up on screen.
+`python -m panda_polymetis.tools.keyboard_interface`
+
+## General Polymetis Instructions
 
 ## Bringing up the robot with polymetis or polysim
 The `launch_robot.py` and `launch_gripper.py` scripts are available from anywhere once you've run `conda activate polymetis`/`source activate polymetis`.
