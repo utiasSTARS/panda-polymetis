@@ -3,12 +3,33 @@ import numpy as np
 from polymetis import GripperInterface
 
 
+DEFAULT_OPEN_WIDTH = 0.085
+
+
+class FakeState:
+    def __init__(self, width):
+        self.width = width
+        pass
+
+
+class FakeGripperInterface:
+    def __init__(self, open_width=DEFAULT_OPEN_WIDTH):
+        self.state = FakeState(open_width)
+
+    def get_state(self):
+        return self.state
+
+    def goto(self, width, *args, **kwargs):
+        self.state.width = width
+
+    def grasp(self, *args, **kwargs):
+        self.state.width = 0
+
+
 class PandaGripperClient:
     # Set up for 2f85
-    def __init__(self, server_ip='localhost', open_width=0.085, grasp_force=20, grip_speed=0.05,
-                 close_force=20, pinch_width=.04, not_open_means_close=True):
-        print("Starting 2f85 gripper client.")
-
+    def __init__(self, server_ip='localhost', open_width=DEFAULT_OPEN_WIDTH, grasp_force=20, grip_speed=0.05,
+                 close_force=20, pinch_width=.04, not_open_means_close=True, fake=False):
         self.server_ip = server_ip
         self.open_width = open_width
         self.default_grasp_force = grasp_force
@@ -18,7 +39,10 @@ class PandaGripperClient:
         self._max_width = open_width
 
         # self.gripper = GripperInterface(ip_address=self.server_ip, enforce_version=False)
-        self.gripper = GripperInterface(ip_address=self.server_ip)
+        if fake:
+            self.gripper = FakeGripperInterface(open_width=open_width)
+        else:
+            self.gripper = GripperInterface(ip_address=self.server_ip)
 
         self._state = "none"  # in case robot turns on with gripper not open
 
@@ -31,6 +55,8 @@ class PandaGripperClient:
         # internal state tracking
         self._pos = None
         self._error_code = 0
+
+        print("2f85 gripper client initialized.")
 
     def get_and_update_state(self):
         state = self.gripper.get_state()
@@ -89,61 +115,3 @@ class PandaGripperClient:
             self.send_move_goal(width=width, speed=speed, blocking=blocking)
 
         return True  # backwards compatibility
-
-
-class FakePandaGripperClient:
-    def __init__(self, server_ip='localhost', open_width=0.08, grasp_force=10, grip_speed=0.1,
-                 close_force=10, pinch_width=.04):
-        print("Starting fake panda gripper client.")
-
-        self.server_ip = server_ip
-        self.open_width = open_width
-        self.default_grasp_force = grasp_force
-        self.default_speed = grip_speed
-        self.default_close_force = close_force
-        self.default_pinch_width = pinch_width
-
-        self._state = "none"  # in case robot turns on with gripper not open
-
-        # internal state tracking
-        self._pos = None
-        self._error_code = 0
-
-    def get_and_update_state(self):
-        if self._state == 'open':
-            pos = self.open_width
-        elif self._state == 'close':
-            pos = 0.0
-        elif self._state == 'pinch':
-            pos = self.default_pinch_width
-        else:
-            pos = .024
-
-        self._pos = pos
-        self._error_code = 0
-
-        return {
-            "pos": pos,
-            "error_code": 0,
-        }
-
-    def send_move_goal(self, width, speed=None, force=None, blocking=False):
-        return True  # backwards compatibility
-
-    def open(self, speed=None, blocking=False):
-        if self._state != "open":
-            self._state = "open"
-        return True  # backwards compatibility
-
-    def close(self, speed=None, force=None, blocking=False):
-        if self._state != "close":
-            self._state = "close"
-        return True  # backwards compatibility
-
-    def grasp(self, force, width=0, ep_inner=-1, ep_outer=-1, speed=None, blocking=False):
-        return True  # backwards compatibility
-
-    def pinch(self, width=None, speed=None, blocking=False):
-        if self._state != "pinch":
-            self._state = "pinch"
-        return True

@@ -268,7 +268,7 @@ def parse_args():
     parser.add_argument('--filename', type=str, default=None,
                 help='Name of file where stored commands will be saved')
     parser.add_argument('--no_gripper', action='store_true', help='run without gripper')
-    parser.add_argument('--gripper_ip', type=str, default='localhost', help='run without gripper')
+    parser.add_argument('--gripper_ip', type=str, default='localhost', help='gripper ip (should be localhost)')
     parser.add_argument('--debug_mode', action='store_true',
                 help='Run in debug mode and save no trajectories')
     return parser.parse_args()
@@ -295,11 +295,8 @@ if __name__=="__main__":
         ee_config_json=json_file)
 
     gripper_client = None
-    if not args.no_gripper and args.server_ip != "localhost":
-        gripper_client = PandaGripperClient(
-            # server_ip='localhost',  # should be run NOT on NUC!
-            server_ip=args.gripper_ip,
-        )
+    if not args.no_gripper:
+        gripper_client = PandaGripperClient(server_ip=args.gripper_ip, fake=args.server_ip == 'localhost')
 
     # Start keyboard interface
     keyboard_interface = KeyboardInterface(

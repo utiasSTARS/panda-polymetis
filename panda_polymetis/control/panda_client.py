@@ -64,7 +64,6 @@ class PandaClient:
         ee_config_json=None,
         sim=False,
     ):
-        print("Starting polymetis panda client.")
         self._server_ip = server_ip
         self._delta_pos_limit = delta_pos_limit
         self._delta_rot_limit = delta_rot_limit
@@ -120,6 +119,8 @@ class PandaClient:
 
         # reset stored/target poses
         self.reset()
+
+        print("Panda client initialized.")
 
     def move_to_joint_positions(self, positions: torch.Tensor, time_to_go: float = None):
         if self._controller_running:
