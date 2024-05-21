@@ -16,3 +16,5 @@ class Rate:
         if sleep_time:
             time.sleep(sleep_time)
         self.last = time.time()
+
+        return sleep_time
