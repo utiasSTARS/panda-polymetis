@@ -63,6 +63,8 @@ class KeyboardInterface:
         gripper_client,
         base_frame=True,
         rot_base_frame=False,
+        t_mv=.003,
+        r_mv=.03,
         debug=False
     ):
         self.arm_client = arm_client
@@ -97,8 +99,8 @@ class KeyboardInterface:
         self.command_list = []
         self.base_frame = base_frame
         self.rot_base_frame = rot_base_frame
-        self.t_mv = .003
-        self.r_mv = .03
+        self.t_mv = t_mv
+        self.r_mv = r_mv
         self.run()
 
     def run(self):
@@ -269,6 +271,8 @@ def parse_args():
                 help='Name of file where stored commands will be saved')
     parser.add_argument('--no_gripper', action='store_true', help='run without gripper')
     parser.add_argument('--gripper_ip', type=str, default='localhost', help='gripper ip (should be localhost)')
+    parser.add_argument('--t_mv', type=float, default=.003, help='movement per trans key, meters')
+    parser.add_argument('--r_mv', type=float, default=.03, help='movement per rot key, rads')
     parser.add_argument('--debug_mode', action='store_true',
                 help='Run in debug mode and save no trajectories')
     return parser.parse_args()
@@ -290,8 +294,8 @@ if __name__=="__main__":
     json_file = os.path.join(pp_dir, 'conf/franka-desk/franka-gripper-and-blue-realsense.json')
     panda_client = PandaClient(
         server_ip=args.server_ip,
-        delta_pos_limit=.02,
-        delta_rot_limit=.2,
+        delta_pos_limit=args.t_mv + .001,
+        delta_rot_limit=args.r_mv + .001,
         ee_config_json=json_file)
 
     gripper_client = None
@@ -303,5 +307,7 @@ if __name__=="__main__":
         save_path=save_path,
         arm_client=panda_client,
         gripper_client=gripper_client,
+        t_mv=args.t_mv,
+        r_mv=args.r_mv,
         debug=args.debug_mode
     )
