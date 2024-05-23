@@ -62,7 +62,7 @@ class PandaClient:
         home_joints=None,
         only_positive_ee_quat=False,
         ee_config_json=None,
-        sim=False,
+        pos_limits=([0.6, 0.3, 0.5], [0.1, -0.45, -0.05])
     ):
         self._server_ip = server_ip
         self._delta_pos_limit = delta_pos_limit
@@ -106,7 +106,7 @@ class PandaClient:
         self._pose_delta_prev_pose_arr = None
         self.store_ee_poses = False
         self.stored_ee_poses = []
-        self.sim = sim
+        self.sim = self._server_ip == 'localhost'
         self._freedrive_is_active = False
         self._poly_error_code = 0
         self._controller_running = False
@@ -116,13 +116,14 @@ class PandaClient:
         self._kx = copy.deepcopy(self.robot.Kx_default)
         self._kxd = copy.deepcopy(self.robot.Kxd_default)
         self.target_pose = None
+        self._pos_limits = np.array(pos_limits)  # should be lower than hardware limits running on server
 
         # reset stored/target poses
         self.reset()
 
         print("Panda client initialized.")
 
-    def move_to_joint_positions(self, positions: torch.Tensor, time_to_go: float = None):
+    def move_to_joint_positions(self, positions: torch.Tensor, time_to_go: float = None, allowable_error: int = 0.1):
         if self._controller_running:
             self.stop_controller()
             self._controller_running = False
@@ -130,7 +131,7 @@ class PandaClient:
 
         error = 10
         tries = 0
-        while error > 0.1:
+        while error > allowable_error:
             if tries > 0:
                 print(f"move_to_joint_positions unsuccessful, trying again...")
             self.robot.move_to_joint_positions(positions=positions, time_to_go=time_to_go)
@@ -149,6 +150,8 @@ class PandaClient:
 
         # transform desired pose into flange frame used by polymetis
         posetf = PoseTransformer(pose=pose)
+        self._check_limits(posetf)
+
         pose_arr = pose2array(matrix2pose(posetf.get_matrix() @ self._ee_tf_mat_inv), order='xyzw')
 
         self.robot.move_to_ee_pose(position=pose_arr[:3], orientation=pose_arr[3:], time_to_go=time_to_go)
@@ -212,6 +215,7 @@ class PandaClient:
         # Continue updating target pose and not actual pose
         if target_pose:
             self.target_pose = PoseTransformer(matrix2pose(des_pose_mat))
+        self._check_limits(self.target_pose)
 
         # transform desired pose into flange frame used by polymetis
         poly_des_pose = torch.tensor(pose2array(matrix2pose(des_pose_mat @ self._ee_tf_mat_inv), order='xyzw'))
@@ -219,6 +223,11 @@ class PandaClient:
         self.robot.update_desired_ee_pose(position=poly_des_pose[:3], orientation=poly_des_pose[3:])
 
         # print(f"shift time: {time.time() - shift_start}")
+
+    def _check_limits(self, pose: PoseTransformer):
+        pose.pose.position.x = np.clip(pose.pose.position.x, self._pos_limits[1][0], self._pos_limits[0][0])
+        pose.pose.position.y = np.clip(pose.pose.position.y, self._pos_limits[1][1], self._pos_limits[0][1])
+        pose.pose.position.z = np.clip(pose.pose.position.z, self._pos_limits[1][2], self._pos_limits[0][2])
 
     def get_motion_recordings(self, base_frame=True, rot_base_frame=False, update_ee_pose=True):
 

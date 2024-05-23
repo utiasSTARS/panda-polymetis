@@ -13,11 +13,11 @@ args = parser.parse_args()
 if args.sim:
     server_ip = 'localhost'
 else:
-    server_ip = os.environ.get('NUC_IP', '192.168.2.2')
+    server_ip = os.environ.get('NUC_IP', '192.168.2.100')
 
 pp_dir = os.path.dirname(panda_polymetis.__file__)
-json_file = os.path.join(pp_dir, 'conf/franka-desk/franka-gripper-and-blue-realsense.json')
-pc = PandaClient(server_ip=server_ip, ee_config_json=json_file)
+# json_file = os.path.join(pp_dir, 'conf/franka-desk/franka-gripper-and-blue-realsense.json')
+pc = PandaClient(server_ip=server_ip, ee_config_json=None)
 state = pc.get_and_update_state()
 num_dec = 7
 
