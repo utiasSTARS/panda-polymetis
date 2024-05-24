@@ -291,12 +291,12 @@ if __name__=="__main__":
 
     # Start clients
     pp_dir = os.path.dirname(panda_polymetis.__file__)
-    json_file = os.path.join(pp_dir, 'conf/franka-desk/franka-gripper-and-blue-realsense.json')
+    # json_file = os.path.join(pp_dir, 'conf/franka-desk/franka-gripper-and-blue-realsense.json')
     panda_client = PandaClient(
         server_ip=args.server_ip,
         delta_pos_limit=args.t_mv + .001,
         delta_rot_limit=args.r_mv + .001,
-        ee_config_json=json_file)
+        ee_config_json=None)
 
     gripper_client = None
     if not args.no_gripper:
