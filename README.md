@@ -5,9 +5,9 @@ Originally developed at Samsung AI Centre -- Montreal, and part of this [tactile
 Modified from the original Samsung version to work with the FR3 (original Panda no longer in production).
 
 ## Requirements/Installation
+- To use this package, you must [install polymetis](https://facebookresearch.github.io/fairo/polymetis/installation.html) on both the RT computer (usually a NUC) that controls the Panda and also on your local computer that will handle vision/policy control
 - [transform-utils](https://github.com/utiasSTARS/transform-utils)
   - `git clone https://github.com/utiasSTARS/transform-utils && cd transform-utils && bash install.sh`
-- To use this package, you must [install polymetis](https://facebookresearch.github.io/fairo/polymetis/installation.html) on both the RT computer (usually a NUC) that controls the Panda and also on your local computer that will handle vision/policy control
 - To use it with an FR3, you *must* [install from source](https://facebookresearch.github.io/fairo/polymetis/installation.html#from-source), and set the `<version_tag_or_commit_hash>` for the `libfranka` build to `0.10.0` (or later, but only `0.10.0` has been tested).
   - **to be confirmed**: the source install might only be required on the NUC, and not on your local version.
 - This still has a pytorch issue, which is fixed by reinstall pytorch as:
