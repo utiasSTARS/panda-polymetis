@@ -9,7 +9,8 @@ setup(
     install_requires=[
         'polymetis',
         'transform_utils',
-        'pymodbus==2.5.3'  # should have been installed by polymetis
+        'pymodbus==2.5.3',  # should have been installed by polymetis
+        'pyrealsense2==2.55.*'
     ],
     include_package_data=True
 )
