@@ -73,10 +73,7 @@ class ArucoClient:
         self.cam_p.daemon = True
         self.cam_p.start()
 
-        # can't get these to work, so leaving out...results in a shared memory leak warning
         atexit.register(self.exit_handler)
-        # signal.signal(signal.SIGINT, self.handle_signal)
-        # signal.signal(signal.SIGTERM, self.handle_signal)
 
         # self.cam_q = queue.Queue()
         # self.cam_p = threading.Thread(target=self._reader, args=(self.cam_q,))
@@ -223,11 +220,6 @@ class ArucoClient:
     def exit_handler(self):
         print("aruco client exit handler called.")
         self.close_shm()
-
-    # def handle_signal(self, signum, frame):
-    #     print("SIGNAL")
-    #     self.exit_handler()
-    #     exit(0)
 
     # def _reader(self, q: queue.Queue):
     #     self._cam = RealsenseAPI(height=480, width=640, fps=30, warm_start=30)
