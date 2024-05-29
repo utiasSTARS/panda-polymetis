@@ -185,6 +185,7 @@ class ArucoClient:
             q_out.put('closed')
 
         finally:
+            cam.close()
             img_shm.close()
             pose_shm.close()
             print("Closed shared memory within process.")
