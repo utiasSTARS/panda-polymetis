@@ -74,7 +74,7 @@ class ArucoClient:
         self.cam_p.start()
 
         # can't get these to work, so leaving out...results in a shared memory leak warning
-        # atexit.register(self.exit_handler)
+        atexit.register(self.exit_handler)
         # signal.signal(signal.SIGINT, self.handle_signal)
         # signal.signal(signal.SIGTERM, self.handle_signal)
 
@@ -89,102 +89,109 @@ class ArucoClient:
 
     def _reader(self, img_shm_name: str, img_lock: mp.Lock, pose_shm_name: str, pose_lock: mp.Lock,
                 q_in: mp.Queue, q_out: mp.Queue):
-        cam = RealsenseAPI(height=self._height, width=self._width, fps=30, warm_start=60)
+        try:
+            cam = RealsenseAPI(height=self._height, width=self._width, fps=30, warm_start=60)
 
-        # shared memory image with self._latest_img
-        # you actually, technically, don't need these (it works without them), but it's much more unintuitive
-        # without them.
-        img_shm = shared_memory.SharedMemory(name=img_shm_name)
-        img = np.ndarray([self._height, self._width, 3], dtype=np.uint8, buffer=img_shm.buf)
-        pose_shm = shared_memory.SharedMemory(name=pose_shm_name)
-        poses = np.ndarray([len(self.valid_marker_ids), 6], dtype=np.float32, buffer=pose_shm.buf)
+            # shared memory image with self._latest_img
+            # you actually, technically, don't need these (it works without them), but it's much more unintuitive
+            # without them.
+            img_shm = shared_memory.SharedMemory(name=img_shm_name)
+            img = np.ndarray([self._height, self._width, 3], dtype=np.uint8, buffer=img_shm.buf)
+            pose_shm = shared_memory.SharedMemory(name=pose_shm_name)
+            poses = np.ndarray([len(self.valid_marker_ids), 6], dtype=np.float32, buffer=pose_shm.buf)
 
-        # get camera intrinsics
-        intrinsics = cam.get_intrinsics()
-        cam_mat = np.eye(3)
-        cam_mat[0, 0] = intrinsics[0].fx
-        cam_mat[1, 1] = intrinsics[0].fy
-        cam_mat[0, 2] = intrinsics[0].ppx
-        cam_mat[1, 2] = intrinsics[0].ppy
-        distort = np.zeros([1, 5])
-        distort[:] = intrinsics[0].coeffs
+            # get camera intrinsics
+            intrinsics = cam.get_intrinsics()
+            cam_mat = np.eye(3)
+            cam_mat[0, 0] = intrinsics[0].fx
+            cam_mat[1, 1] = intrinsics[0].fy
+            cam_mat[0, 2] = intrinsics[0].ppx
+            cam_mat[1, 2] = intrinsics[0].ppy
+            distort = np.zeros([1, 5])
+            distort[:] = intrinsics[0].coeffs
 
-        # aruco detector
-        # ar_params = aruco.DetectorParameters()
-        detector = aruco.ArucoDetector(dictionary=self._dictionary)
+            # aruco detector
+            # ar_params = aruco.DetectorParameters()
+            detector = aruco.ArucoDetector(dictionary=self._dictionary)
 
-        # marker stale detection
-        last_marker_time = dict()
-        for id in self.valid_marker_ids:
-            last_marker_time[id] = time.time()
+            # marker stale detection
+            last_marker_time = dict()
+            for id in self.valid_marker_ids:
+                last_marker_time[id] = time.time()
 
-        last_time = time.time()
-
-        q_out.put('init')
-
-        while True:
-            cam_img = cam.get_rgb(reverse_channels=True)
-            img_lock.acquire()
-            img[:] = cam_img[:]
-            # img_lock.release()
-
-            # print(f"Image acquire time: {time.time() - last_time}")
             last_time = time.time()
 
-            # compute aruco marker locations
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            corners, ids, rejected_img_points = detector.detectMarkers(gray)
-            marker_read_time = time.time()
+            q_out.put('init')
 
-            if len(corners) > 0:
-                # img_lock.acquire()
-                aruco.drawDetectedMarkers(img, corners, ids)
-            img_lock.release()
+            while True:
+                cam_img = cam.get_rgb(reverse_channels=True)
+                img_lock.acquire()
+                img[:] = cam_img[:]
+                # img_lock.release()
 
-            for id in last_marker_time.keys():
-                if marker_read_time > last_marker_time[id] + self.max_marker_stale_time:
-                    print(f"WARNING: marker {id} is stale for {marker_read_time - last_marker_time[id]:.3f}s")
+                # print(f"Image acquire time: {time.time() - last_time}")
+                last_time = time.time()
 
-            if len(corners) > 0:
-                pose_lock.acquire()
-                for id, corner in zip(ids, corners):
-                    iid = int(id)
-                    if iid in self.valid_marker_ids:
-                        last_marker_time[iid] = time.time()
-                        valid_i = self.valid_marker_ids.index(iid)
-                        rvec, tvec, marker_points = aruco.estimatePoseSingleMarkers(
-                            corner, self.marker_width, cam_mat, distort)
-                        # self._marker_poses[valid_i] = np.concatenate([tvec.flatten(), rvec.flatten()])
+                # compute aruco marker locations
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                corners, ids, rejected_img_points = detector.detectMarkers(gray)
+                marker_read_time = time.time()
 
-                        if hasattr(self, 'base_to_cam_tf_mat') or hasattr(self, 'marker_to_obj_tf_mat'):
-                            # start_trans = time.time()
-                            marker_tf_mat = PoseTransformer(
-                                pose=np.concatenate([tvec.flatten(), rvec.flatten()]),
-                                rotation_representation='rvec').get_matrix()
-                            if hasattr(self, 'base_to_cam_tf_mat'):
-                                marker_tf_mat = self.base_to_cam_tf_mat.dot(marker_tf_mat)
-                            if hasattr(self, 'marker_to_obj_tf_mat'):
-                                marker_tf_mat = marker_tf_mat.dot(self.marker_to_obj_tf_mat)
-                            pose_tf = PoseTransformer(pose=marker_tf_mat, rotation_representation='mat')
-                            marker_tvec_rvec = pose_tf.get_array_rvec()
-                            tvec = marker_tvec_rvec[:3]
-                            rvec = marker_tvec_rvec[3:]
+                if len(corners) > 0:
+                    # img_lock.acquire()
+                    aruco.drawDetectedMarkers(img, corners, ids)
+                img_lock.release()
 
-                            # if valid_i == 0:
-                            #     print(f"trans time: {time.time() - start_trans:.4f}")
+                for id in last_marker_time.keys():
+                    if marker_read_time > last_marker_time[id] + self.max_marker_stale_time:
+                        print(f"WARNING: marker {id} is stale for {marker_read_time - last_marker_time[id]:.3f}s")
 
-                        poses[valid_i] = np.concatenate([tvec.flatten(), rvec.flatten()])
-                pose_lock.release()
+                if len(corners) > 0:
+                    pose_lock.acquire()
+                    for id, corner in zip(ids, corners):
+                        iid = int(id)
+                        if iid in self.valid_marker_ids:
+                            last_marker_time[iid] = time.time()
+                            valid_i = self.valid_marker_ids.index(iid)
+                            rvec, tvec, marker_points = aruco.estimatePoseSingleMarkers(
+                                corner, self.marker_width, cam_mat, distort)
+                            # self._marker_poses[valid_i] = np.concatenate([tvec.flatten(), rvec.flatten()])
 
-            if not q_in.empty():
-                comm = q_in.get(block=True)
-                if comm == 'close':
-                    break
+                            if hasattr(self, 'base_to_cam_tf_mat') or hasattr(self, 'marker_to_obj_tf_mat'):
+                                # start_trans = time.time()
+                                marker_tf_mat = PoseTransformer(
+                                    pose=np.concatenate([tvec.flatten(), rvec.flatten()]),
+                                    rotation_representation='rvec').get_matrix()
+                                if hasattr(self, 'base_to_cam_tf_mat'):
+                                    marker_tf_mat = self.base_to_cam_tf_mat.dot(marker_tf_mat)
+                                if hasattr(self, 'marker_to_obj_tf_mat'):
+                                    marker_tf_mat = marker_tf_mat.dot(self.marker_to_obj_tf_mat)
+                                pose_tf = PoseTransformer(pose=marker_tf_mat, rotation_representation='mat')
+                                marker_tvec_rvec = pose_tf.get_array_rvec()
+                                tvec = marker_tvec_rvec[:3]
+                                rvec = marker_tvec_rvec[3:]
 
-        img_shm.close()
-        pose_shm.close()
-        print("Closed shared memory within process.")
-        q_out.put('closed')
+                                # if valid_i == 0:
+                                #     print(f"trans time: {time.time() - start_trans:.4f}")
+
+                            poses[valid_i] = np.concatenate([tvec.flatten(), rvec.flatten()])
+                    pose_lock.release()
+
+                if not q_in.empty():
+                    comm = q_in.get(block=True)
+                    if comm == 'close':
+                        break
+
+            img_shm.close()
+            pose_shm.close()
+            print("Closed shared memory within process.")
+            q_out.put('closed')
+
+        finally:
+            img_shm.close()
+            pose_shm.close()
+            print("Closed shared memory within process.")
+            q_out.put('closed')
 
     def get_latest_image(self):
         self._img_lock.acquire()
@@ -214,7 +221,7 @@ class ArucoClient:
         raise NotImplementedError()
 
     def exit_handler(self):
-        print("EXIT HANDLER")
+        print("aruco client exit handler called.")
         self.close_shm()
 
     # def handle_signal(self, signum, frame):
