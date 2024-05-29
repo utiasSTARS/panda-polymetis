@@ -290,8 +290,6 @@ if __name__=="__main__":
         save_path = os.path.join(main_dir, "data", "stored_commands")
 
     # Start clients
-    pp_dir = os.path.dirname(panda_polymetis.__file__)
-    # json_file = os.path.join(pp_dir, 'conf/franka-desk/franka-gripper-and-blue-realsense.json')
     panda_client = PandaClient(
         server_ip=args.server_ip,
         delta_pos_limit=args.t_mv + .001,

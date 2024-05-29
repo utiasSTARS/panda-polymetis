@@ -4,7 +4,9 @@ import json
 import torch
 import time
 import copy
+import os
 
+import panda_polymetis
 from polymetis import RobotInterface
 import torchcontrol as toco
 import torchcontrol.transform as toco_tf
@@ -75,8 +77,10 @@ class PandaClient:
 
         # load custom ee setup
         if ee_config_json is None:
-            warnings.warn("No ee_config_json file set. Save the desk ee config json if you want to run actions "
-                          "in the frame defined in desk.", RuntimeWarning)
+            pp_dir = os.path.dirname(panda_polymetis.__file__)
+            ee_config_json = os.path.join(pp_dir, 'conf', 'franka-desk', os.environ['PANDA_EE_JSON'])
+            # warnings.warn("No ee_config_json file set. Save the desk ee config json if you want to run actions "
+            #               "in the frame defined in desk.", RuntimeWarning)
         else:
             with open(ee_config_json, "r") as f:
                 ee_config = json.load(f)
