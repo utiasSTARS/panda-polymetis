@@ -6,6 +6,8 @@ import threading
 import queue
 import time
 import copy
+import atexit
+import signal
 
 import numpy as np
 import cv2
@@ -45,7 +47,8 @@ class ArucoClient:
 
         # aruco info to keep track of
         self._dictionary = aruco.getPredefinedDictionary(getattr(aruco, dictionary))
-        self.valid_marker_ids = valid_marker_ids
+        self.valid_marker_ids = list(valid_marker_ids)
+        assert len(valid_marker_ids) > 0
         self.marker_width = marker_width
         dummy_poses = np.zeros([len(valid_marker_ids), 6], dtype=np.float32)
         self._poses_shm = shared_memory.SharedMemory(create=True, size=dummy_poses.nbytes)
@@ -69,6 +72,11 @@ class ArucoClient:
             self._comm_q_in, self._comm_q_out))
         self.cam_p.daemon = True
         self.cam_p.start()
+
+        # can't get these to work, so leaving out...results in a shared memory leak warning
+        # atexit.register(self.exit_handler)
+        # signal.signal(signal.SIGINT, self.handle_signal)
+        # signal.signal(signal.SIGTERM, self.handle_signal)
 
         # self.cam_q = queue.Queue()
         # self.cam_p = threading.Thread(target=self._reader, args=(self.cam_q,))
@@ -157,8 +165,8 @@ class ArucoClient:
                                 marker_tf_mat = self.base_to_cam_tf_mat.dot(marker_tf_mat)
                             if hasattr(self, 'marker_to_obj_tf_mat'):
                                 marker_tf_mat = marker_tf_mat.dot(self.marker_to_obj_tf_mat)
-                            marker_tvec_rvec = PoseTransformer(
-                                pose=marker_tf_mat, rotation_representation='mat').get_array_rvec()
+                            pose_tf = PoseTransformer(pose=marker_tf_mat, rotation_representation='mat')
+                            marker_tvec_rvec = pose_tf.get_array_rvec()
                             tvec = marker_tvec_rvec[:3]
                             rvec = marker_tvec_rvec[3:]
 
@@ -204,6 +212,15 @@ class ArucoClient:
     def get_rigid_body_rel_poses(self):
         """ Interact with user to get relative poses between fixed markers """
         raise NotImplementedError()
+
+    def exit_handler(self):
+        print("EXIT HANDLER")
+        self.close_shm()
+
+    # def handle_signal(self, signum, frame):
+    #     print("SIGNAL")
+    #     self.exit_handler()
+    #     exit(0)
 
     # def _reader(self, q: queue.Queue):
     #     self._cam = RealsenseAPI(height=480, width=640, fps=30, warm_start=30)
