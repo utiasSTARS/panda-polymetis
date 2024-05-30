@@ -19,6 +19,9 @@ pc = PandaClient(server_ip=server_ip, ee_config_json=None)
 state = pc.get_and_update_state()
 num_dec = 7
 
+raw_ee_pose = pc.robot.get_ee_pose()
+print(f"Raw pose from polymetis: {raw_ee_pose}")
+
 base_tool_tf = state['EE_pose'].get_array_euler(axes='sxyz')
 bttf_beginning = ', '.join([f"{e:.{num_dec}}" for e in base_tool_tf[:-1]])
 print(f"reset_pose: [{bttf_beginning}, {base_tool_tf[-1]:.{num_dec}}]")

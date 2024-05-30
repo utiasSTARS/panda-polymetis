@@ -66,6 +66,11 @@ There are other command line arguments you can set using hydra.
 See the [config file](https://github.com/facebookresearch/fairo/blob/main/polymetis/polymetis/conf/robot_client/franka_hardware.yaml).
 
 #### Gripper
+With the 2f85, on the host machine, bring up the server with:
+```
+launch_gripper.py gripper=robotiq_2f gripper.comport=/dev/ttyUSB0
+```
+
 On the host machine (_not_ the NUC, since the NUC should have as little running on it as possible),
 ```
 launch_gripper.py gripper=franka_hand robot_client.executable_cfg.robot_ip=$ROBOT_IP

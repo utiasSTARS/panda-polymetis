@@ -247,23 +247,33 @@ class ArucoClient:
 
 
 if __name__ == '__main__':
-    ac = ArucoClient(480, 640, marker_width=.052, valid_marker_ids=(0, 1),
-        base_to_cam_tf=[.2, .1, .1, 0, 0, 0], marker_to_obj_tf=[.3, 0., 0., 0., 0., 0.])
+    import argparse
+    from ast import literal_eval
 
-    try:
-        for _ in range(50):
-            # img = ac.get_image(block_until_latest=False)
-            img = ac.get_latest_image()
-            cv2.imshow('Estimated Pose', img)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--marker_ids', type=str, default='(0,)')
+    parser.add_argument('--resolution', type=str, default='(480,640)')
+    parser.add_argument('--marker_width', type=float, default=.056)
+    parser.add_argument('--num_timesteps', type=int, default=50)
+    parser.add_argument('--sleep_period', type=float, default=.2)
+    args = parser.parse_args()
 
-            poses = ac.get_latest_poses()
-            print(poses)
+    height, width = literal_eval(args.resolution)
+    marker_ids = literal_eval(args.marker_ids)
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                break
+    ac = ArucoClient(height, width, marker_width=args.marker_width, valid_marker_ids=marker_ids,
+        base_to_cam_tf=[0., 0., 0., 0, 0, 0], marker_to_obj_tf=[0., 0., 0., 0., 0., 0.])
 
-            time.sleep(.2)
+    for _ in range(args.num_timesteps):
+        # img = ac.get_image(block_until_latest=False)
+        img = ac.get_latest_image()
+        cv2.imshow('Estimated Pose', img)
 
-    finally:
-        ac.close_shm()
+        poses = ac.get_latest_poses()
+        print(poses)
+
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+
+        time.sleep(args.sleep_period)
