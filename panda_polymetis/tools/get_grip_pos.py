@@ -8,11 +8,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--sim', action='store_true')
 args = parser.parse_args()
 
-
-if args.sim:
-    gc = PandaGripperClient(server_ip='localhost', fake=True)
-else:
-    gc = PandaGripperClient(server_ip=os.environ.get('NUC_IP', '192.168.2.100'), fake=True)
+gc = PandaGripperClient(server_ip='localhost', fake=args.sim)
 
 state = gc.get_and_update_state()
 

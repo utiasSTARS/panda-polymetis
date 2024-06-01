@@ -256,18 +256,47 @@ class PandaClient:
             print(f"Shift called, but move to within limits would cause movement of {dist}. "\
                   f"Move robot within soft limits of {self._pos_limits}")
             return
+        
+        # cap trans diff between current true pose and desired pose
+        # keep direction from old target to new target
+        max_error = 1.25 * self._delta_pos_limit
+        actual_posetf, _ = self.get_and_update_ee_pose()
+        pos_error = np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())
+        if pos_error > max_error:
+            pos_diff_dir = (new_target.get_pos() - actual_posetf.get_pos()) / pos_error
+            pos_diff_fixed = max_error * pos_diff_dir
+            new_target.set_pos(actual_posetf.get_pos() + pos_diff_fixed)
+        print(f"DEBUG: target - current: {np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())}")
 
         if target_pose:
+            target_changed = new_target != self.target_pose
             self.target_pose = new_target
-    
-        # transform des pose into non-adjusted base frame
-        if self._base_pose_offset_mat is not None:
-            des_pose_mat = self._base_pose_offset_mat.dot(des_pose_mat)
 
-        # transform desired pose into flange frame used by polymetis
-        poly_des_pose = torch.tensor(pose2array(matrix2pose(des_pose_mat @ self._ee_tf_mat_inv), order='xyzw'))
+        if target_changed:
+            # transform des pose into non-adjusted base frame
+            if self._base_pose_offset_mat is not None:
+                des_pose_mat = self._base_pose_offset_mat.dot(des_pose_mat)
 
-        self.robot.update_desired_ee_pose(position=poly_des_pose[:3], orientation=poly_des_pose[3:])
+            # transform desired pose into flange frame used by polymetis
+            poly_des_pose = torch.tensor(pose2array(matrix2pose(des_pose_mat @ self._ee_tf_mat_inv), order='xyzw'))
+
+            if not self.robot.is_running_policy():
+                return False
+
+            self.robot.update_desired_ee_pose(position=poly_des_pose[:3], orientation=poly_des_pose[3:])
+
+            # workaround to detect if controller is in error state
+            joints_before = self.robot.get_joint_positions()
+            time.sleep(.005)
+            joints_after = self.robot.get_joint_positions()
+            joints_diff = np.linalg.norm(joints_after - joints_before)
+
+            if joints_diff < 1e-10:
+                print("Joints did not change after update_desired_ee_pose! Is controller in error state?")
+                # print(f"joint diff: {joints_diff}")
+                return False
+
+        return True
 
         # print(f"shift time: {time.time() - shift_start}")
 

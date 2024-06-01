@@ -81,11 +81,18 @@ class PandaGripperClient:
 
         return True  # backwards compatibility
 
-    def open(self, speed=None, blocking=False):
+    def open(self, speed=None, blocking=False, timeout=5.0):
         if speed is None: speed = self.default_speed
         if self._state != "open":
             self._state = "open"
             self.send_move_goal(width=self.open_width, speed=speed, blocking=blocking)
+        if blocking:
+            start_time = time.time()
+            while not self.is_fully_open() and time.time() - start_time < timeout:
+                time.sleep(0.1)
+
+            if not self.is_fully_open():
+                raise ValueError(f"Gripper didn't open after {timeout}s.")
 
         return True  # backwards compatibility
 
