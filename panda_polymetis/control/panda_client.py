@@ -53,7 +53,9 @@ from geometry_msgs.msg import PoseStamped
 
 SIM_DEFAULT_POS_LIMITS = ([0.6, 0.3, 0.5], [0.1, -0.45, -0.05])
 # REAL_DEFAULT_POS_LIMITS = ([0.6117, 0.4739, 0.6], [0.1, 0.141, 0.0])
-REAL_DEFAULT_POS_LIMITS = ([0.6538695, 0.37, 0.75], [0.35, -0.37, 0.0])
+# REAL_DEFAULT_POS_LIMITS = ([0.6538695, 0.37, 0.75], [0.35, -0.37, 0.0])
+REAL_DEFAULT_POS_LIMITS = ([0.66, 0.37, 0.75], [0.35, -0.37, 0.0])
+# REAL_DEFAULT_POS_LIMITS = ([0.645, 0.37, 0.75], [0.35, -0.37, 0.0])
 REAL_DEFAULT_POSEULSXYZ_OFFSET = ([0, 0, 0, 0, 0, 0.6267])
 
 
@@ -70,7 +72,8 @@ class PandaClient:
         only_positive_ee_quat=False,
         ee_config_json=None,
         pos_limits=None,
-        base_poseulsxyz_offset=None
+        base_poseulsxyz_offset=None,
+        max_force_from_error=None
     ):
         self._server_ip = server_ip
         self._delta_pos_limit = delta_pos_limit
@@ -117,6 +120,12 @@ class PandaClient:
         self.home_joints = self.robot.get_joint_positions() if home_joints is None else \
             torch.tensor(home_joints, dtype=torch.float)
         self.robot.set_home_pose(self.home_joints)
+
+        if max_force_from_error is not None:
+            # assuming same stiffness in all directions
+            kx = self.robot.Kx_default[:3]
+            assert kx[0] == kx[1] == kx[2]
+            self._max_cart_error = np.array(max_force_from_error / kx[0])
 
         # state tracking
         self.joint_position = None
@@ -248,6 +257,7 @@ class PandaClient:
         if target_pose:
             new_target = PoseTransformer(matrix2pose(des_pose_mat))
             # self.target_pose = PoseTransformer(matrix2pose(des_pose_mat))
+
         self._enforce_limits(new_target)
 
         # ensure distance between cur and target isn't excessive after enforcing limits
@@ -259,21 +269,29 @@ class PandaClient:
         
         # cap trans diff between current true pose and desired pose
         # keep direction from old target to new target
-        max_error = 1.25 * self._delta_pos_limit
-        actual_posetf, _ = self.get_and_update_ee_pose()
-        pos_error = np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())
-        if pos_error > max_error:
-            pos_diff_dir = (new_target.get_pos() - actual_posetf.get_pos()) / pos_error
-            pos_diff_fixed = max_error * pos_diff_dir
-            new_target.set_pos(actual_posetf.get_pos() + pos_diff_fixed)
-        print(f"DEBUG: target - current: {np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())}")
+        if hasattr(self, '_max_cart_error'):
+            max_error = self._max_cart_error
+            actual_posetf, _ = self.get_and_update_ee_pose()
+            pos_error = np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())
+            if pos_error > max_error:
+                pos_diff_dir = (new_target.get_pos() - actual_posetf.get_pos()) / pos_error
+                pos_diff_fixed = max_error * pos_diff_dir
+                new_target.set_pos(actual_posetf.get_pos() + pos_diff_fixed)
+        # actual_posetf, _ = self.get_and_update_ee_pose()
+        # print(f"DEBUG: target - current: {np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())}")
 
         if target_pose:
-            target_changed = new_target != self.target_pose
+            new_pos = np.linalg.norm(new_target.get_pos() - self.target_pose.get_pos()) > 1e-10
+            new_rot = np.linalg.norm(self.target_pose.get_rvec() - new_target.get_rvec()) > 1e-10
+            target_changed = new_pos or new_rot
+            # target_changed = new_target != self.target_pose
             self.target_pose = new_target
+        
+        # print(f"DEBUG: new target {self.target_pose}")
 
         if target_changed:
             # transform des pose into non-adjusted base frame
+            des_pose_mat = new_target.get_matrix()
             if self._base_pose_offset_mat is not None:
                 des_pose_mat = self._base_pose_offset_mat.dot(des_pose_mat)
 

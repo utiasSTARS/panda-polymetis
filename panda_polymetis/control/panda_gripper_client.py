@@ -81,9 +81,9 @@ class PandaGripperClient:
 
         return True  # backwards compatibility
 
-    def open(self, speed=None, blocking=False, timeout=5.0):
+    def open(self, speed=None, blocking=False, timeout=5.0, force_send=False):
         if speed is None: speed = self.default_speed
-        if self._state != "open":
+        if self._state != "open" or force_send:
             self._state = "open"
             self.send_move_goal(width=self.open_width, speed=speed, blocking=blocking)
         if blocking:
