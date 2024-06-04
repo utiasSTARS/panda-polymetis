@@ -85,26 +85,29 @@ class PandaClient:
         self._ee_tf_mat = np.eye(4)
 
         # load custom ee setup
-        if ee_config_json is None:
-            pp_dir = os.path.dirname(panda_polymetis.__file__)
-            ee_config_json = os.path.join(pp_dir, 'conf', 'franka-desk', f"{os.environ['PANDA_EE_JSON']}.json")
-            # warnings.warn("No ee_config_json file set. Save the desk ee config json if you want to run actions "
-            #               "in the frame defined in desk.", RuntimeWarning)
-        with open(ee_config_json, "r") as f:
-            ee_config = json.load(f)
-        trans = np.array(ee_config['transformation'])
+        if server_ip != 'localhost':
+            if ee_config_json is None:
+                pp_dir = os.path.dirname(panda_polymetis.__file__)
+                ee_config_json = os.path.join(pp_dir, 'conf', 'franka-desk', f"{os.environ['PANDA_EE_JSON']}.json")
+                # warnings.warn("No ee_config_json file set. Save the desk ee config json if you want to run actions "
+                #               "in the frame defined in desk.", RuntimeWarning)
+            with open(ee_config_json, "r") as f:
+                ee_config = json.load(f)
+            trans = np.array(ee_config['transformation'])
 
-        self._ee_tf_mat[:, 0] = trans[:4]
-        self._ee_tf_mat[:, 1] = trans[4:8]
-        self._ee_tf_mat[:, 2] = trans[8:12]
-        self._ee_tf_mat[:, 3] = trans[12:16]
+            self._ee_tf_mat[:, 0] = trans[:4]
+            self._ee_tf_mat[:, 1] = trans[4:8]
+            self._ee_tf_mat[:, 2] = trans[8:12]
+            self._ee_tf_mat[:, 3] = trans[12:16]
 
         self._ee_tf_mat_inv = np.linalg.inv(self._ee_tf_mat)
 
         if base_poseulsxyz_offset is None and server_ip != 'localhost':
             base_poseulsxyz_offset = REAL_DEFAULT_POSEULSXYZ_OFFSET
-        
+
+        self._base_pose_offset_mat = None
         self._base_pose_offset = None
+        self._base_pose_offset_mat_inv = None
         if base_poseulsxyz_offset is not None:
             self._base_pose_offset_mat = PoseTransformer(
                 pose=base_poseulsxyz_offset, rotation_representation='euler', axes='syxz').get_matrix()
@@ -266,7 +269,7 @@ class PandaClient:
             print(f"Shift called, but move to within limits would cause movement of {dist}. "\
                   f"Move robot within soft limits of {self._pos_limits}")
             return
-        
+
         # cap trans diff between current true pose and desired pose
         # keep direction from old target to new target
         if hasattr(self, '_max_cart_error'):
@@ -286,7 +289,7 @@ class PandaClient:
             target_changed = new_pos or new_rot
             # target_changed = new_target != self.target_pose
             self.target_pose = new_target
-        
+
         # print(f"DEBUG: new target {self.target_pose}")
 
         if target_changed:
@@ -318,7 +321,7 @@ class PandaClient:
 
         # print(f"shift time: {time.time() - shift_start}")
 
-    def _enforce_limits(self, pose: PoseTransformer):      
+    def _enforce_limits(self, pose: PoseTransformer):
         pose.pose.position.x = np.clip(pose.pose.position.x, self._pos_limits[1][0], self._pos_limits[0][0])
         pose.pose.position.y = np.clip(pose.pose.position.y, self._pos_limits[1][1], self._pos_limits[0][1])
         pose.pose.position.z = np.clip(pose.pose.position.z, self._pos_limits[1][2], self._pos_limits[0][2])
