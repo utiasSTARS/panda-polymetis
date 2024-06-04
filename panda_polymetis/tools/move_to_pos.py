@@ -10,7 +10,8 @@ from transform_utils.pose_transforms import PoseTransformer
 
 # drawer
 # move_pose_euler_sxyz = [0.3654211, 0.1962629, 0.682987, 1.91674, -0.7635592, 1.304907]  # reset pos-ish
-move_pose_euler_sxyz = [0.654, 0.1962629, 0.6356113, 1.91674, -0.7635592, 1.304907]  # grasp handle drawer closed pos
+# move_pose_euler_sxyz = [0.654, 0.1962629, 0.6356113, 1.91674, -0.7635592, 1.304907]  # grasp handle drawer closed pos
+move_pose_euler_sxyz = [0.368471, 0.2031552, 0.63, 1.91674, -0.7635592, 1.304907]  # drawer 1DOF reset pose
 
 move_pose = PoseTransformer(pose=move_pose_euler_sxyz, rotation_representation='euler', axes='sxyz')
 pc = PandaClient(server_ip=os.environ['NUC_IP'])

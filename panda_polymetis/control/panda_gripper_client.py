@@ -92,6 +92,8 @@ class PandaGripperClient:
                 time.sleep(0.1)
 
             if not self.is_fully_open():
+                print(f"Timeout: Gripper didn't open after {timeout}s.")
+                return False
                 raise ValueError(f"Gripper didn't open after {timeout}s.")
 
         return True  # backwards compatibility
