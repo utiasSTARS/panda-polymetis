@@ -52,10 +52,8 @@ from geometry_msgs.msg import PoseStamped
 # configs for launching can be seen here https://github.com/facebookresearch/fairo/tree/main/polymetis/polymetis/conf
 
 SIM_DEFAULT_POS_LIMITS = ([0.6, 0.3, 0.5], [0.1, -0.45, -0.05])
-# REAL_DEFAULT_POS_LIMITS = ([0.6117, 0.4739, 0.6], [0.1, 0.141, 0.0])
-# REAL_DEFAULT_POS_LIMITS = ([0.6538695, 0.37, 0.75], [0.35, -0.37, 0.0])
-REAL_DEFAULT_POS_LIMITS = ([0.66, 0.37, 0.75], [0.35, -0.37, 0.0])
-# REAL_DEFAULT_POS_LIMITS = ([0.645, 0.37, 0.75], [0.35, -0.37, 0.0])
+# REAL_DEFAULT_POS_LIMITS = ([0.66, 0.37, 0.75], [0.35, -0.37, 0.0])  # for drawer
+REAL_DEFAULT_POS_LIMITS = ([0.65, 0.37, 0.75], [0.35, -0.37, 0.0])  # for door
 REAL_DEFAULT_POSEULSXYZ_OFFSET = ([0, 0, 0, 0, 0, 0.6267])
 
 
@@ -266,7 +264,7 @@ class PandaClient:
         # ensure distance between cur and target isn't excessive after enforcing limits
         dist = np.linalg.norm(cur_posetf.get_pos() - new_target.get_pos())
         if dist > self._delta_pos_limit:
-            print(f"Shift called, but move to within limits would cause movement of {dist}. "\
+            print(f"Shift called, but cur pos is {cur_posetf.get_pos()}, and move to within limits would cause movement of {dist}. "\
                   f"Move robot within soft limits of {self._pos_limits}")
             return
 

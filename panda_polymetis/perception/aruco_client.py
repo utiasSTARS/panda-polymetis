@@ -271,6 +271,7 @@ if __name__ == '__main__':
 
         poses = ac.get_latest_poses()
         print(poses)
+        # print(f"dist from cam: {np.linalg.norm(poses[0][:3])}")
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
