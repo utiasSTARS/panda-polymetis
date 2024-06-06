@@ -264,7 +264,7 @@ class PandaClient:
 
         # ensure distance between cur and target isn't excessive after enforcing limits
         dist = np.linalg.norm(cur_posetf.get_pos() - new_target.get_pos())
-        if dist > self._delta_pos_limit:
+        if dist > self._delta_pos_limit + .01:
             print(f"Shift called, but cur pos is {cur_posetf.get_pos()}, and move to within limits would cause movement of {dist}. "\
                   f"Move robot within soft limits of {self._pos_limits}")
             return
