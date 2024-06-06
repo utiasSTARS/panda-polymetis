@@ -4,6 +4,7 @@ from polymetis import GripperInterface
 
 
 DEFAULT_OPEN_WIDTH = 0.085
+DEFAULT_PINCH_WIDTH = 0.05
 
 
 class FakeState:
@@ -29,7 +30,7 @@ class FakeGripperInterface:
 class PandaGripperClient:
     # Set up for 2f85
     def __init__(self, server_ip='localhost', open_width=DEFAULT_OPEN_WIDTH, grasp_force=20, grip_speed=0.05,
-                 close_force=20, pinch_width=.04, not_open_means_close=True, fake=False):
+                 close_force=20, pinch_width=DEFAULT_PINCH_WIDTH, not_open_means_close=True, fake=False):
         self.server_ip = server_ip
         self.open_width = open_width
         self.default_grasp_force = grasp_force

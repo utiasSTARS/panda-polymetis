@@ -53,7 +53,8 @@ from geometry_msgs.msg import PoseStamped
 
 SIM_DEFAULT_POS_LIMITS = ([0.6, 0.3, 0.5], [0.1, -0.45, -0.05])
 # REAL_DEFAULT_POS_LIMITS = ([0.66, 0.37, 0.75], [0.35, -0.37, 0.0])  # for drawer
-REAL_DEFAULT_POS_LIMITS = ([0.65, 0.37, 0.75], [0.35, -0.37, 0.0])  # for door
+# REAL_DEFAULT_POS_LIMITS = ([0.65, 0.37, 0.75], [0.35, -0.37, 0.0])  # for door
+REAL_DEFAULT_POS_LIMITS = [[0.645, 0.37, 0.75], [0.33, -0.325, 0.0]]  # for nojam angle door
 REAL_DEFAULT_POSEULSXYZ_OFFSET = ([0, 0, 0, 0, 0, 0.6267])
 
 
