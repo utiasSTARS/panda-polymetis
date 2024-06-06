@@ -4,6 +4,7 @@ from polymetis import GripperInterface
 
 
 DEFAULT_OPEN_WIDTH = 0.085
+DEFAULT_PINCH_WIDTH = 0.05
 
 
 class FakeState:
@@ -29,7 +30,7 @@ class FakeGripperInterface:
 class PandaGripperClient:
     # Set up for 2f85
     def __init__(self, server_ip='localhost', open_width=DEFAULT_OPEN_WIDTH, grasp_force=20, grip_speed=0.05,
-                 close_force=20, pinch_width=.04, not_open_means_close=True, fake=False):
+                 close_force=20, pinch_width=DEFAULT_PINCH_WIDTH, not_open_means_close=True, fake=False):
         self.server_ip = server_ip
         self.open_width = open_width
         self.default_grasp_force = grasp_force
@@ -81,11 +82,20 @@ class PandaGripperClient:
 
         return True  # backwards compatibility
 
-    def open(self, speed=None, blocking=False):
+    def open(self, speed=None, blocking=False, timeout=5.0, force_send=False):
         if speed is None: speed = self.default_speed
-        if self._state != "open":
+        if self._state != "open" or force_send:
             self._state = "open"
             self.send_move_goal(width=self.open_width, speed=speed, blocking=blocking)
+        if blocking:
+            start_time = time.time()
+            while not self.is_fully_open() and time.time() - start_time < timeout:
+                time.sleep(0.1)
+
+            if not self.is_fully_open():
+                print(f"Timeout: Gripper didn't open after {timeout}s.")
+                return False
+                raise ValueError(f"Gripper didn't open after {timeout}s.")
 
         return True  # backwards compatibility
 

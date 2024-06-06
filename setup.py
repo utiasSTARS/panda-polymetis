@@ -10,7 +10,8 @@ setup(
         'polymetis',
         'transform_utils',
         'pymodbus==2.5.3',  # should have been installed by polymetis
-        'pyrealsense2==2.55.*'
+        'pyrealsense2==2.55.*',
+        'opencv-contrib-python==4.9.*'
     ],
     include_package_data=True
 )

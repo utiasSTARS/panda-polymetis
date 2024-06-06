@@ -15,11 +15,12 @@ if args.sim:
 else:
     server_ip = os.environ.get('NUC_IP', '192.168.2.100')
 
-pp_dir = os.path.dirname(panda_polymetis.__file__)
-# json_file = os.path.join(pp_dir, 'conf/franka-desk/franka-gripper-and-blue-realsense.json')
 pc = PandaClient(server_ip=server_ip, ee_config_json=None)
 state = pc.get_and_update_state()
 num_dec = 7
+
+raw_ee_pose = pc.robot.get_ee_pose()
+print(f"Raw pose from polymetis: {raw_ee_pose}")
 
 base_tool_tf = state['EE_pose'].get_array_euler(axes='sxyz')
 bttf_beginning = ', '.join([f"{e:.{num_dec}}" for e in base_tool_tf[:-1]])

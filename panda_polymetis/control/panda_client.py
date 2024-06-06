@@ -4,7 +4,9 @@ import json
 import torch
 import time
 import copy
+import os
 
+import panda_polymetis
 from polymetis import RobotInterface
 import torchcontrol as toco
 import torchcontrol.transform as toco_tf
@@ -49,6 +51,12 @@ from geometry_msgs.msg import PoseStamped
 
 # configs for launching can be seen here https://github.com/facebookresearch/fairo/tree/main/polymetis/polymetis/conf
 
+SIM_DEFAULT_POS_LIMITS = ([0.6, 0.3, 0.5], [0.1, -0.45, -0.05])
+# REAL_DEFAULT_POS_LIMITS = ([0.66, 0.37, 0.75], [0.35, -0.37, 0.0])  # for drawer
+# REAL_DEFAULT_POS_LIMITS = ([0.65, 0.37, 0.75], [0.35, -0.37, 0.0])  # for door
+REAL_DEFAULT_POS_LIMITS = [[0.645, 0.37, 0.75], [0.33, -0.325, 0.0]]  # for nojam angle door
+REAL_DEFAULT_POSEULSXYZ_OFFSET = ([0, 0, 0, 0, 0, 0.6267])
+
 
 class PandaClient:
     """
@@ -62,7 +70,9 @@ class PandaClient:
         home_joints=None,
         only_positive_ee_quat=False,
         ee_config_json=None,
-        pos_limits=([0.6, 0.3, 0.5], [0.1, -0.45, -0.05])
+        pos_limits=None,
+        base_poseulsxyz_offset=None,
+        max_force_from_error=None
     ):
         self._server_ip = server_ip
         self._delta_pos_limit = delta_pos_limit
@@ -74,10 +84,12 @@ class PandaClient:
         self._ee_tf_mat = np.eye(4)
 
         # load custom ee setup
-        if ee_config_json is None:
-            warnings.warn("No ee_config_json file set. Save the desk ee config json if you want to run actions "
-                          "in the frame defined in desk.", RuntimeWarning)
-        else:
+        if server_ip != 'localhost':
+            if ee_config_json is None:
+                pp_dir = os.path.dirname(panda_polymetis.__file__)
+                ee_config_json = os.path.join(pp_dir, 'conf', 'franka-desk', f"{os.environ['PANDA_EE_JSON']}.json")
+                # warnings.warn("No ee_config_json file set. Save the desk ee config json if you want to run actions "
+                #               "in the frame defined in desk.", RuntimeWarning)
             with open(ee_config_json, "r") as f:
                 ee_config = json.load(f)
             trans = np.array(ee_config['transformation'])
@@ -89,6 +101,19 @@ class PandaClient:
 
         self._ee_tf_mat_inv = np.linalg.inv(self._ee_tf_mat)
 
+        if base_poseulsxyz_offset is None and server_ip != 'localhost':
+            base_poseulsxyz_offset = REAL_DEFAULT_POSEULSXYZ_OFFSET
+
+        self._base_pose_offset_mat = None
+        self._base_pose_offset = None
+        self._base_pose_offset_mat_inv = None
+        if base_poseulsxyz_offset is not None:
+            self._base_pose_offset_mat = PoseTransformer(
+                pose=base_poseulsxyz_offset, rotation_representation='euler', axes='syxz').get_matrix()
+            self._base_pose_offset_mat_inv = np.linalg.inv(self._base_pose_offset_mat)
+            # self._base_pose_offset_mat = np.linalg.inv(PoseTransformer(
+            #     pose=base_poseulsxyz_offset, rotation_representation='euler', axes='syxz').get_matrix())
+
         # initialize polymetis client
         # self.robot = RobotInterface(ip_address=self._server_ip, enforce_version=False)
 
@@ -97,6 +122,12 @@ class PandaClient:
         self.home_joints = self.robot.get_joint_positions() if home_joints is None else \
             torch.tensor(home_joints, dtype=torch.float)
         self.robot.set_home_pose(self.home_joints)
+
+        if max_force_from_error is not None:
+            # assuming same stiffness in all directions
+            kx = self.robot.Kx_default[:3]
+            assert kx[0] == kx[1] == kx[2]
+            self._max_cart_error = np.array(max_force_from_error / kx[0])
 
         # state tracking
         self.joint_position = None
@@ -116,7 +147,12 @@ class PandaClient:
         self._kx = copy.deepcopy(self.robot.Kx_default)
         self._kxd = copy.deepcopy(self.robot.Kxd_default)
         self.target_pose = None
-        self._pos_limits = np.array(pos_limits)  # should be lower than hardware limits running on server
+
+        if pos_limits is None:
+            pos_limits = SIM_DEFAULT_POS_LIMITS if server_ip == 'localhost' else REAL_DEFAULT_POS_LIMITS
+            self._pos_limits = np.array(pos_limits)  # should be lower than hardware limits running on server
+        else:
+            self._pos_limits = pos_limits
 
         # reset stored/target poses
         self.reset()
@@ -149,10 +185,17 @@ class PandaClient:
             self._controller_running = False  # polymetis automatically overrides our own controller with move_to_ee_pose
 
         # transform desired pose into flange frame used by polymetis
-        posetf = PoseTransformer(pose=pose)
-        self._check_limits(posetf)
+        # posetf = PoseTransformer(pose=pose)
+        # self._enforce_limits(posetf)  # careful with this...can cause large movements if you're outside limits
+        posetf_matrix = PoseTransformer(pose=pose).get_matrix()
 
-        pose_arr = pose2array(matrix2pose(posetf.get_matrix() @ self._ee_tf_mat_inv), order='xyzw')
+        # transform des pose into non-adjusted base frame
+        if self._base_pose_offset_mat is not None:
+            posetf_matrix = self._base_pose_offset_mat.dot(posetf_matrix)
+
+        # transform desired pose into flange frame used by polymetis
+        # pose_arr = pose2array(matrix2pose(posetf.get_matrix() @ self._ee_tf_mat_inv), order='xyzw')
+        pose_arr = pose2array(matrix2pose(posetf_matrix @ self._ee_tf_mat_inv), order='xyzw')
 
         self.robot.move_to_ee_pose(position=pose_arr[:3], orientation=pose_arr[3:], time_to_go=time_to_go)
 
@@ -214,17 +257,70 @@ class PandaClient:
 
         # Continue updating target pose and not actual pose
         if target_pose:
-            self.target_pose = PoseTransformer(matrix2pose(des_pose_mat))
-        self._check_limits(self.target_pose)
+            new_target = PoseTransformer(matrix2pose(des_pose_mat))
+            # self.target_pose = PoseTransformer(matrix2pose(des_pose_mat))
 
-        # transform desired pose into flange frame used by polymetis
-        poly_des_pose = torch.tensor(pose2array(matrix2pose(des_pose_mat @ self._ee_tf_mat_inv), order='xyzw'))
+        self._enforce_limits(new_target)
 
-        self.robot.update_desired_ee_pose(position=poly_des_pose[:3], orientation=poly_des_pose[3:])
+        # ensure distance between cur and target isn't excessive after enforcing limits
+        dist = np.linalg.norm(cur_posetf.get_pos() - new_target.get_pos())
+        if dist > self._delta_pos_limit + .01:
+            print(f"Shift called, but cur pos is {cur_posetf.get_pos()}, and move to within limits would cause movement of {dist}. "\
+                  f"Move robot within soft limits of {self._pos_limits}")
+            return
+
+        # cap trans diff between current true pose and desired pose
+        # keep direction from old target to new target
+        if hasattr(self, '_max_cart_error'):
+            max_error = self._max_cart_error
+            actual_posetf, _ = self.get_and_update_ee_pose()
+            pos_error = np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())
+            if pos_error > max_error:
+                pos_diff_dir = (new_target.get_pos() - actual_posetf.get_pos()) / pos_error
+                pos_diff_fixed = max_error * pos_diff_dir
+                new_target.set_pos(actual_posetf.get_pos() + pos_diff_fixed)
+        # actual_posetf, _ = self.get_and_update_ee_pose()
+        # print(f"DEBUG: target - current: {np.linalg.norm(new_target.get_pos() - actual_posetf.get_pos())}")
+
+        if target_pose:
+            new_pos = np.linalg.norm(new_target.get_pos() - self.target_pose.get_pos()) > 1e-10
+            new_rot = np.linalg.norm(self.target_pose.get_rvec() - new_target.get_rvec()) > 1e-10
+            target_changed = new_pos or new_rot
+            # target_changed = new_target != self.target_pose
+            self.target_pose = new_target
+
+        # print(f"DEBUG: new target {self.target_pose}")
+
+        if target_changed:
+            # transform des pose into non-adjusted base frame
+            des_pose_mat = new_target.get_matrix()
+            if self._base_pose_offset_mat is not None:
+                des_pose_mat = self._base_pose_offset_mat.dot(des_pose_mat)
+
+            # transform desired pose into flange frame used by polymetis
+            poly_des_pose = torch.tensor(pose2array(matrix2pose(des_pose_mat @ self._ee_tf_mat_inv), order='xyzw'))
+
+            if not self.robot.is_running_policy():
+                return False
+
+            self.robot.update_desired_ee_pose(position=poly_des_pose[:3], orientation=poly_des_pose[3:])
+
+            # workaround to detect if controller is in error state
+            joints_before = self.robot.get_joint_positions()
+            time.sleep(.005)
+            joints_after = self.robot.get_joint_positions()
+            joints_diff = np.linalg.norm(joints_after - joints_before)
+
+            if joints_diff < 1e-10:
+                print("Joints did not change after update_desired_ee_pose! Is controller in error state?")
+                # print(f"joint diff: {joints_diff}")
+                return False
+
+        return True
 
         # print(f"shift time: {time.time() - shift_start}")
 
-    def _check_limits(self, pose: PoseTransformer):
+    def _enforce_limits(self, pose: PoseTransformer):
         pose.pose.position.x = np.clip(pose.pose.position.x, self._pos_limits[1][0], self._pos_limits[0][0])
         pose.pose.position.y = np.clip(pose.pose.position.y, self._pos_limits[1][1], self._pos_limits[0][1])
         pose.pose.position.z = np.clip(pose.pose.position.z, self._pos_limits[1][2], self._pos_limits[0][2])
@@ -303,6 +399,12 @@ class PandaClient:
         ee_pose_raw_posetf = self.pos_quat_to_posetf(ee_pos_raw, ee_quat_raw)
         ee_pose_T = ee_pose_raw_posetf.get_matrix() @ self._ee_tf_mat
         self.EE_pose = PoseTransformer(matrix2pose(ee_pose_T, frame_id="panda_link0"))
+
+        # add fixed base offset if there is one
+        if self._base_pose_offset_mat_inv is not None:
+            new_pose_mat = self._base_pose_offset_mat_inv.dot(self.EE_pose.get_matrix())
+            self.EE_pose = PoseTransformer(pose=new_pose_mat, rotation_representation='mat')
+
         self.EE_pose_arr = self.EE_pose.get_array_quat()
 
         return self.EE_pose, self.EE_pose_arr
